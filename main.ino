@@ -1,72 +1,83 @@
-const int pinoPot = A0; 
+const int pinPot = A0;
 
-const int primeiroLed = 2;
-const int ultimoLed = 13;
-const int numLeds = ultimoLed - primeiroLed + 1;
+const int FSTLed = 2;
+const int LSTLed = 13;
+const int NLeds = LSTLed - FSTLed + 1;
 
-int direcaoAlvo = -1;
-unsigned long tempoInicio = 0;
-bool esperando = false;
-bool mantidoPor1Segundo = false;
-unsigned long tempoDentroZona = 0;
+int targetDirection = -1;
+unsigned long startTime = 0;
+bool waiting = false;
+bool heldFor1Second = false;
+unsigned long timeWithinZone = 0;
 
 void setup() {
   Serial.begin(9600);
-  for (int pino = primeiroLed; pino <= ultimoLed; pino++) {
-    pinMode(pino, OUTPUT);
+  for (int pin = FSTLed; pin <= LSTLed; pin++) {
+    pinMode(pin, OUTPUT);
   }
   randomSeed(analogRead(A1));
-  escolherNovaDirecao();
+  choseNewDirection();
 }
 
 void loop() {
-  int leitura = analogRead(pinoPot);
-  int posVolante = map(leitura, 0, 1023, 0, numLeds - 1);
-  apagarTodosLEDs();
-  digitalWrite(primeiroLed + posVolante, HIGH);
-  piscarLedAlvo();
+  int read = analogRead(pinPot);
 
-  if (esperando) {
-    if (posVolante == direcaoAlvo) {
-      if (!mantidoPor1Segundo) {
-        tempoDentroZona = millis();
-        mantidoPor1Segundo = true;
-      } else if (millis() - tempoDentroZona >= 1000) {
-        unsigned long tempoReacao = millis() - tempoInicio;
-        Serial.print("Tempo de reação (posição alvo ");
-        Serial.print(direcaoAlvo + 1);
-        Serial.print("): ");
-        Serial.print(tempoReacao);
-        Serial.println(" ms");
-        escolherNovaDirecao();
+  // Definir os limites seguros: 20% e 80% da faixa do potenciômetro
+  const int minRead = 205;  // ~20% de 1023
+  const int maxRead = 818;  // ~80% de 1023
+
+  // Restringir read aos limites definidos
+  read = constrain(read, minRead, maxRead);
+
+  // Mapear a faixa central para a quantidade de LEDs
+  int steeringPos = map(read, minRead, maxRead, 0, NLeds - 1);
+
+  turnOffAllLEDs();
+  digitalWrite(FSTLed + steeringPos, HIGH);
+  blinkTargetLED();
+
+  if (waiting) {
+    if (steeringPos == targetDirection) {
+      if (!heldFor1Second) {
+        timeWithinZone = millis();
+        heldFor1Second = true;
+      } else if (millis() - timeWithinZone >= 1000) {
+        unsigned long reactionTime = millis() - startTime;
+        //Serial.print("Reaction time (target position) ");
+        //Serial.print(targetDirection + 1);
+        //Serial.print("): ");
+        Serial.print(reactionTime);
+        //Serial.println(" ms");
+        choseNewDirection();
       }
     } else {
-      mantidoPor1Segundo = false;
+      heldFor1Second = false;
     }
   }
+
   delay(10);
 }
 
-void escolherNovaDirecao() {
-  direcaoAlvo = random(0, numLeds);
-  tempoInicio = millis();
-  esperando = true;
-  mantidoPor1Segundo = false;
-  Serial.print("Nova direção alvo: ");
-  Serial.println(direcaoAlvo + 1);
+void choseNewDirection() {
+  targetDirection = random(0, NLeds);
+  startTime = millis();
+  waiting = true;
+  heldFor1Second = false;
+  //Serial.print("Nova direção alvo: ");
+  //Serial.println(targetDirection + 1);
 }
 
-void apagarTodosLEDs() {
-  for (int pino = primeiroLed; pino <= ultimoLed; pino++) {
-    digitalWrite(pino, LOW);
+void turnOffAllLEDs() {
+  for (int pin = FSTLed; pin <= LSTLed; pin++) {
+    digitalWrite(pin, LOW);
   }
 }
 
-void piscarLedAlvo() {
-  unsigned long agora = millis();
-  if ((agora / 250) % 2 == 0) {
-    digitalWrite(primeiroLed + direcaoAlvo, HIGH);
+void blinkTargetLED() {
+  unsigned long now = millis();
+  if ((now / 250) % 2 == 0) {
+    digitalWrite(FSTLed + targetDirection, HIGH);
   } else {
-    digitalWrite(primeiroLed + direcaoAlvo, LOW);
+    digitalWrite(FSTLed + targetDirection, LOW);
   }
 }
